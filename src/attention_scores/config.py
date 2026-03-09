@@ -36,8 +36,21 @@ class Config(BaseModel):
         "auto",
         description="Device: auto, cpu, cuda, cuda:0, npu, npu:0",
     )
+    # Visualization (post-processing of pipeline outputs)
+    visualization_output_dir: str = Field(
+        "",
+        description="Directory to save visualization plots; if empty, uses output_dir/visualization",
+    )
+    visualization_enabled: bool = Field(
+        True,
+        description="Whether to build visualizations when running the pipeline",
+    )
+    visualization_formats: list[str] = Field(
+        default_factory=lambda: ["png"],
+        description="File formats for saved plots (e.g. png, svg)",
+    )
 
-    @field_validator("dataset_path", "model_path", "output_dir", mode="before")
+    @field_validator("dataset_path", "model_path", "output_dir", "visualization_output_dir", mode="before")
     @classmethod
     def coerce_path_str(cls, v: Any) -> str:
         """Coerce Path to str for serialization."""

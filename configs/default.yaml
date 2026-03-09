@@ -13,3 +13,8 @@ output_dir: "./output"
 save_prefill_attention: false
 sparsity_threshold: 1.0e-6
 # device: "auto"  # or "cpu", "cuda", "cuda:0", "npu", "npu:0"
+# Visualization (post-processing)
+# visualization_output_dir: ""   # default: output_dir/visualization
+visualization_enabled: true
+visualization_formats:
+  - png

@@ -37,6 +37,8 @@ def test_write_and_load_metadata(tmp_output_dir: Path) -> None:
             "newly_important_count": 5,
             "no_longer_important_count": 0,
             "sparsity": [[2, 3], [4, 5]],
+            "seq_len": 20,
+            "sparsity_proportion": 0.75,
         },
     ]
     write_metadata(
@@ -58,6 +60,8 @@ def test_write_and_load_metadata(tmp_output_dir: Path) -> None:
     assert meta["num_heads"] == 2
     assert len(meta["per_step"]) == 1
     assert meta["per_step"][0]["num_important_tokens"] == 5
+    assert meta["per_step"][0]["seq_len"] == 20
+    assert meta["per_step"][0]["sparsity_proportion"] == 0.75
     assert meta["thinking_events"][0]["marker"] == "Wait,"
 
 

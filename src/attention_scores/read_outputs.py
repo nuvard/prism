@@ -27,6 +27,8 @@ class PerStepDict(TypedDict, total=False):
     newly_important_count: int
     no_longer_important_count: int
     sparsity: list[list[int]]
+    seq_len: int
+    sparsity_proportion: float
 
 
 class RequestMetadata(TypedDict):

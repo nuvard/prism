@@ -100,6 +100,22 @@ def sparsity_per_layer_head(
     return np.count_nonzero(above, axis=-1).astype(np.int32)
 
 
+def sparsity_proportion(num_important: int, seq_len: int) -> float:
+    """
+    Proportion of unimportant tokens to total (sparsity as fraction).
+
+    Args:
+        num_important: Number of important token positions (e.g. from importance threshold).
+        seq_len: Total sequence length (number of tokens).
+
+    Returns:
+        (seq_len - num_important) / seq_len when seq_len > 0, else 0.0.
+    """
+    if seq_len <= 0:
+        return 0.0
+    return (seq_len - num_important) / seq_len
+
+
 def aggregate_attention_row_for_importance(
     attention_row: ArrayLike,
 ) -> np.ndarray:

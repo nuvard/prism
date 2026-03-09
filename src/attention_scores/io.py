@@ -56,7 +56,8 @@ def write_metadata(
     Write metadata.json for one request.
 
     per_step: list of dicts, one per saved step, each with keys e.g. step, num_important_tokens,
-    newly_important_count, no_longer_important_count, sparsity (list of list or dict layer -> head -> value).
+    newly_important_count, no_longer_important_count, sparsity (list of list or dict layer -> head -> value),
+    seq_len, sparsity_proportion.
     """
     dir_path = _request_dir(output_dir, request_id)
     dir_path.mkdir(parents=True, exist_ok=True)

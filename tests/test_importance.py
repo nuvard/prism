@@ -10,6 +10,7 @@ from attention_scores.importance import (
     importance_from_attention_row,
     sparsity_count_above_threshold,
     sparsity_per_layer_head,
+    sparsity_proportion,
     step_importance_and_sparsity,
 )
 
@@ -102,3 +103,21 @@ def test_step_importance_and_sparsity() -> None:
     assert len(indices) == num_important
     assert sparsity.shape == (2, 1)
     assert sparsity[0, 0] == 4  # all above 0.01
+
+
+def test_sparsity_proportion_zero_seq_len() -> None:
+    """sparsity_proportion returns 0.0 when seq_len is 0."""
+    assert sparsity_proportion(0, 0) == 0.0
+    assert sparsity_proportion(5, 0) == 0.0
+
+
+def test_sparsity_proportion_normal() -> None:
+    """sparsity_proportion is (seq_len - num_important) / seq_len."""
+    # 2 important out of 10 -> 8/10 = 0.8
+    assert sparsity_proportion(2, 10) == 0.8
+    assert sparsity_proportion(7, 10) == 0.3
+
+
+def test_sparsity_proportion_all_important() -> None:
+    """When all tokens are important, proportion is 0.0."""
+    assert sparsity_proportion(10, 10) == 0.0

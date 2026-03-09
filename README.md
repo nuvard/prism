@@ -42,17 +42,22 @@ attention_scores/
 ├── configs/
 │   └── default.yaml          # Default config (paths, N, K, device, etc.)
 ├── src/
-│   └── attention_scores/     # Main package
+│   ├── attention_scores/     # Main package
+│   │   ├── __init__.py
+│   │   ├── config.py        # Config load/validation (pydantic)
+│   │   ├── dataset_schema.py # JSON dataset schema
+│   │   ├── device.py        # CPU / CUDA / NPU (torch_npu) selection
+│   │   ├── importance.py    # Importance (0.95), deltas, sparsity, save condition
+│   │   ├── thinking.py     # Thinking marker detection
+│   │   ├── attention_utils.py # Extract current row / prefill from model output
+│   │   ├── io.py            # Save metadata, attention rows, prefill, answers
+│   │   ├── read_outputs.py  # Load and parse saved outputs
+│   │   └── run.py           # Main pipeline and CLI entry
+│   └── visualization/       # Post-processing: plots from pipeline outputs
 │       ├── __init__.py
-│       ├── config.py        # Config load/validation (pydantic)
-│       ├── dataset_schema.py # JSON dataset schema
-│       ├── device.py        # CPU / CUDA / NPU (torch_npu) selection
-│       ├── importance.py    # Importance (0.95), deltas, sparsity, save condition
-│       ├── thinking.py     # Thinking marker detection
-│       ├── attention_utils.py # Extract current row / prefill from model output
-│       ├── io.py            # Save metadata, attention rows, prefill, answers
-│       ├── read_outputs.py  # Load and parse saved outputs
-│       └── run.py           # Main pipeline and CLI entry
+│       ├── aggregate.py     # Discover requests, aggregate per-step metrics
+│       ├── plots.py         # Importance/deltas dynamics, score distribution, sparsity
+│       └── generate.py      # Orchestration and CLI for visualization-only run
 ├── tests/                   # Pytest tests (artificial data, no model)
 ├── design.md                # Project requirements
 ├── requirements.txt
@@ -79,6 +84,14 @@ Or with explicit interpreter:
 
 Ensure `PYTHONPATH` includes `src` if the package is not installed (e.g. `set PYTHONPATH=src` on Windows, or install in editable mode).
 
+To generate visualizations from **existing** pipeline output (no model run):
+
+```bash
+python -m visualization.generate configs/default.yaml
+```
+
+This reads `output_dir` from the config and writes plots to `visualization_output_dir` (or `output_dir/visualization` if not set).
+
 ## Configuration
 
 | Parameter | Description |
@@ -95,6 +108,9 @@ Ensure `PYTHONPATH` includes `src` if the package is not installed (e.g. `set PY
 | `save_prefill_attention` | If true, save prefill attention in `prefill/` per request |
 | `sparsity_threshold` | Threshold for sparsity metric (count of weights above) |
 | `device` | `auto`, `cpu`, `cuda`, `cuda:0`, `npu`, `npu:0` (NPU via torch_npu) |
+| `visualization_output_dir` | Directory for saved plots; if empty, uses `output_dir/visualization` |
+| `visualization_enabled` | If true, build plots after pipeline run (default true) |
+| `visualization_formats` | List of file formats for plots (e.g. `png`, `svg`; default `["png"]`) |
 
 ## Output format
 
@@ -150,4 +166,4 @@ pytest tests -v
 $env:PYTHONPATH="src"; pytest tests -v
 ```
 
-Tests use artificial data only (no model or GPU). They cover importance, deltas, save condition, sparsity, io save/load, and read_outputs parsing.
+Tests use artificial data only (no model or GPU). They cover importance, deltas, save condition, sparsity, io save/load, read_outputs parsing, and visualization (aggregate, plots, generate).

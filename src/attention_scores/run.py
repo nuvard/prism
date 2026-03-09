@@ -23,6 +23,7 @@ from .device import get_device
 from .importance import (
     compute_deltas,
     should_save_on_step,
+    sparsity_proportion,
     step_importance_and_sparsity,
 )
 from .io import (
@@ -69,6 +70,10 @@ def run_pipeline(config_path: str | Path) -> None:
     write_generated_answers(config.output_dir, answers)
     dataset_serializable = [_item_to_dict(d) for d in dataset]
     write_dataset_used(config.output_dir, dataset_serializable)
+
+    if getattr(config, "visualization_enabled", True):
+        from visualization.generate import run_visualization
+        run_visualization(config)
 
 
 def _item_to_dict(item: DatasetItem) -> dict[str, Any]:
@@ -188,12 +193,15 @@ def _process_one(
             saved_steps.append(step)
             last_saved_step = step
             sparsity_list = sparsity_arr.tolist()
+            seq_len = int(current_row.shape[-1])
             per_step_meta.append({
                 "step": step,
                 "num_important_tokens": num_important,
                 "newly_important_count": count_new,
                 "no_longer_important_count": count_no_longer,
                 "sparsity": sparsity_list,
+                "seq_len": seq_len,
+                "sparsity_proportion": sparsity_proportion(num_important, seq_len),
             })
 
         if next_token.item() == tokenizer.eos_token_id:
