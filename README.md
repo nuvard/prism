@@ -1,6 +1,8 @@
-# Attention Scores Pipeline
+# Pipeline for Recording Importance and Sparsity Metrics (PRISM)
 
 Pipeline for collecting attention scores (current row of the attention matrix) during autoregressive generation, together with importance statistics (tokens needed to reach 0.95 cumulative weight), deltas (newly important / no longer important), sparsity per layer/head, and thinking-marker detection. Output is written per request for later analysis.
+
+Note: this is fully vibecoded project!
 
 ## Requirements
 
