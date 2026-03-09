@@ -202,6 +202,8 @@ def test_load_metadata_with_sparsity_per_layer_and_per_layer_head_deltas(
             "no_longer_important_per_layer_head": [[0, 0], [0, 0]],
             "sparsity": [[2, 3], [4, 5]],
             "sparsity_per_layer": [5, 9],
+            "sparsity_proportion_per_layer_head": [[0.8, 0.7], [0.6, 0.5]],
+            "sparsity_proportion_per_layer": [0.75, 0.55],
             "seq_len": 10,
             "sparsity_proportion": 0.7,
         },
@@ -222,6 +224,11 @@ def test_load_metadata_with_sparsity_per_layer_and_per_layer_head_deltas(
     assert meta["per_step"][0]["sparsity_per_layer"] == [5, 9]
     assert meta["per_step"][0]["newly_important_per_layer_head"] == [[1, 0], [1, 1]]
     assert meta["per_step"][0]["no_longer_important_per_layer_head"] == [[0, 0], [0, 0]]
+    assert meta["per_step"][0]["sparsity_proportion_per_layer_head"] == [
+        [0.8, 0.7],
+        [0.6, 0.5],
+    ]
+    assert meta["per_step"][0]["sparsity_proportion_per_layer"] == [0.75, 0.55]
 
 
 def test_write_progress(tmp_output_dir: Path) -> None:

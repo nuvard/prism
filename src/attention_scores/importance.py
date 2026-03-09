@@ -264,6 +264,57 @@ def sparsity_proportion(num_important: int, seq_len: int) -> float:
     return (seq_len - num_important) / seq_len
 
 
+def sparsity_proportion_per_layer_head(
+    sparsity_layer_head: np.ndarray,
+    seq_len: int,
+) -> np.ndarray:
+    """
+    Sparsity as proportion (fraction of unimportant positions) per (layer, head).
+
+    Args:
+        sparsity_layer_head: Array of shape (num_layers, num_heads) of raw counts
+            (from sparsity_per_layer_head).
+        seq_len: Total sequence length (number of tokens).
+
+    Returns:
+        Array of shape (num_layers, num_heads), dtype float. Value [l, h] =
+        (seq_len - count) / seq_len when seq_len > 0, else 0.0.
+    """
+    arr = np.asarray(sparsity_layer_head, dtype=np.float64)
+    if arr.size == 0:
+        return arr.copy()
+    if seq_len <= 0:
+        return np.zeros_like(arr, dtype=np.float64)
+    return (seq_len - arr) / seq_len
+
+
+def sparsity_proportion_per_layer(
+    sparsity_layer_head: np.ndarray,
+    seq_len: int,
+) -> np.ndarray:
+    """
+    Sparsity as proportion per layer (fraction of unimportant positions over all heads).
+
+    Args:
+        sparsity_layer_head: Array of shape (num_layers, num_heads) of raw counts.
+        seq_len: Total sequence length (number of tokens).
+
+    Returns:
+        Array of shape (num_layers,), dtype float. For layer l:
+        (seq_len * num_heads - sum_heads_l) / (seq_len * num_heads) when
+        denominator > 0, else 0.0.
+    """
+    arr = np.asarray(sparsity_layer_head, dtype=np.float64)
+    if arr.ndim < 2 or arr.size == 0:
+        return np.array([], dtype=np.float64)
+    n_heads = arr.shape[1]
+    total_per_layer = seq_len * n_heads
+    if total_per_layer <= 0:
+        return np.zeros(arr.shape[0], dtype=np.float64)
+    sum_per_layer = arr.sum(axis=1)
+    return (total_per_layer - sum_per_layer) / total_per_layer
+
+
 def aggregate_attention_row_for_importance(
     attention_row: ArrayLike,
 ) -> np.ndarray:

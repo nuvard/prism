@@ -60,7 +60,8 @@ def write_metadata(
     newly_important_per_layer, no_longer_important_per_layer (lists of length num_layers),
     newly_important_per_layer_head, no_longer_important_per_layer_head (list[layer][head] counts),
     sparsity (list of list layer -> head -> value), sparsity_per_layer (list of length num_layers),
-    seq_len, sparsity_proportion.
+    sparsity_proportion_per_layer_head (list[layer][head] float), sparsity_proportion_per_layer
+    (list of length num_layers, float), seq_len, sparsity_proportion.
     """
     dir_path = _request_dir(output_dir, request_id)
     dir_path.mkdir(parents=True, exist_ok=True)

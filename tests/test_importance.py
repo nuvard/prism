@@ -12,6 +12,8 @@ from attention_scores.importance import (
     sparsity_per_layer,
     sparsity_per_layer_head,
     sparsity_proportion,
+    sparsity_proportion_per_layer,
+    sparsity_proportion_per_layer_head,
     step_importance_and_sparsity,
 )
 
@@ -140,3 +142,53 @@ def test_sparsity_proportion_normal() -> None:
 def test_sparsity_proportion_all_important() -> None:
     """When all tokens are important, proportion is 0.0."""
     assert sparsity_proportion(10, 10) == 0.0
+
+
+def test_sparsity_proportion_per_layer_head() -> None:
+    """sparsity_proportion_per_layer_head returns (seq_len - count) / seq_len per (layer, head)."""
+    # (2 layers, 2 heads): counts 2,3 and 4,5 -> seq_len 10 -> 0.8, 0.7 and 0.6, 0.5
+    sparsity_lh = np.array([[2, 3], [4, 5]], dtype=np.int32)
+    out = sparsity_proportion_per_layer_head(sparsity_lh, seq_len=10)
+    assert out.shape == (2, 2)
+    assert out.dtype == np.float64
+    assert out[0, 0] == 0.8
+    assert out[0, 1] == 0.7
+    assert out[1, 0] == 0.6
+    assert out[1, 1] == 0.5
+
+
+def test_sparsity_proportion_per_layer_head_zero_seq_len() -> None:
+    """sparsity_proportion_per_layer_head returns 0.0 when seq_len is 0."""
+    sparsity_lh = np.array([[2, 3], [4, 5]], dtype=np.int32)
+    out = sparsity_proportion_per_layer_head(sparsity_lh, seq_len=0)
+    assert out.shape == (2, 2)
+    assert (out == 0.0).all()
+
+
+def test_sparsity_proportion_per_layer() -> None:
+    """sparsity_proportion_per_layer is (seq_len*num_heads - sum_heads) / (seq_len*num_heads)."""
+    # (2 layers, 2 heads), seq_len 10 -> total 20 per layer; sums 5 and 9 -> 15/20=0.75, 11/20=0.55
+    sparsity_lh = np.array([[2, 3], [4, 5]], dtype=np.int32)
+    out = sparsity_proportion_per_layer(sparsity_lh, seq_len=10)
+    assert out.shape == (2,)
+    assert out.dtype == np.float64
+    assert out[0] == 0.75  # (20 - 5) / 20
+    assert out[1] == 0.55  # (20 - 9) / 20
+
+
+def test_sparsity_proportion_per_layer_zero_seq_len() -> None:
+    """sparsity_proportion_per_layer returns 0.0 when seq_len is 0."""
+    sparsity_lh = np.array([[2, 3], [4, 5]], dtype=np.int32)
+    out = sparsity_proportion_per_layer(sparsity_lh, seq_len=0)
+    assert out.shape == (2,)
+    assert (out == 0.0).all()
+
+
+def test_sparsity_proportion_per_layer_empty() -> None:
+    """sparsity_proportion_per_layer returns empty array for empty or 1-dim input."""
+    assert sparsity_proportion_per_layer(np.array([]), 10).shape == (0,)
+    arr = np.array([[1, 2]])
+    out = sparsity_proportion_per_layer(arr, seq_len=10)
+    assert out.shape == (1,)
+    # (20 - 3) / 20 = 0.85
+    assert out[0] == 0.85

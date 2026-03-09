@@ -93,6 +93,9 @@
 - Собирать и сохранять разреженность в том же формате и в те же моменты, что и число важных токенов: по шагам, с разбивкой по слоям и головам.
   - **По головам**: в метаданных на каждый шаг — `sparsity[layer][head]` для всех слоёв и голов (сырые счётчики по каждой голове).
   - **По слоям**: дополнительно сохранять `sparsity_per_layer` — список длины num_layers, для каждого слоя — сумма счётчиков по всем головам этого слоя (сырой счётчик по слою).
+- Сохранять **спарсность в виде пропорции по слою и по головам**:
+  - `sparsity_proportion_per_layer` — список длины num_layers: для каждого слоя доля «неважных» позиций по всем головам слоя: `(seq_len * num_heads - сумма_по_головам) / (seq_len * num_heads)`.
+  - `sparsity_proportion_per_layer_head` — список списков float `[layer][head]`: для каждой головы доля `(seq_len - count_above_threshold) / seq_len`.
 - В метаданных на каждый сохраняемый шаг также: `num_important_tokens` (raw).
 - Дополнительно на каждом сохраняемом шаге считать и сохранять **sparsity как долю неважных токенов**: `(seq_len - num_important) / seq_len`; в метаданных per_step хранить `seq_len` и `sparsity_proportion`.
 
@@ -128,7 +131,7 @@
 - Единая схема имён: ключи вида `layer_<L>_head_<H>` или явная индексация по слою/голове во всех артефактах.
 - Формат файлов: NPZ с чёткими ключами или JSON с числовыми массивами; при необходимости — `manifest.json` или `format_spec.json` с описанием размерностей и ключей для валидации при чтении.
 - Папка на запрос: `output_dir / request_<id>/`:
-  - `metadata.json` — обновляется **после каждого шага** декодирования; шаги, дельты, порог 0.95, thinking-события, параметры N/K, флаг prefill; в каждом элементе `per_step` — одна запись на каждый шаг декодирования: num_important_tokens (raw), newly_important_count, no_longer_important_count, опционально `newly_important_per_layer`, `no_longer_important_per_layer` (списки длины num_layers), опционально `newly_important_per_layer_head`, `no_longer_important_per_layer_head` (списки списков [layer][head]), sparsity по слоям/головам (`sparsity[layer][head]`), `sparsity_per_layer` (список длины num_layers — сумма по головам слоя), seq_len, sparsity_proportion.
+  - `metadata.json` — обновляется **после каждого шага** декодирования; шаги, дельты, порог 0.95, thinking-события, параметры N/K, флаг prefill; в каждом элементе `per_step` — одна запись на каждый шаг декодирования: num_important_tokens (raw), newly_important_count, no_longer_important_count, опционально `newly_important_per_layer`, `no_longer_important_per_layer` (списки длины num_layers), опционально `newly_important_per_layer_head`, `no_longer_important_per_layer_head` (списки списков [layer][head]), sparsity по слоям/головам (`sparsity[layer][head]`), `sparsity_per_layer` (список длины num_layers — сумма по головам слоя), `sparsity_proportion_per_layer`, `sparsity_proportion_per_layer_head`, seq_len, sparsity_proportion.
   - `attention_rows/` — текущие строки attention (decode) только для сохранённых шагов (например, `step_<k>.npz`).
   - При включённом prefill — `prefill/` с матрицами по слоям/головам.
 - Общие артефакты: сгенерированные ответы (JSON/JSONL с request_id, prompt, generated_text, steps и т.д.); копия или путь к датасету (например, `output_dir/dataset_used.json`).
@@ -147,7 +150,7 @@
 ## 15. Визуализация
 
 - **Назначение**: постобработка готовых выводов пайплайна без вызова модели. Чтение данных из `output_dir` (metadata.json, при необходимости attention_rows) через API read_outputs; построение графиков и сохранение в каталог и форматы, заданные в конфиге.
-- **Входные данные**: `metadata.json` по каждому запросу (per_step: шаги, num_important_tokens, newly_important_count, no_longer_important_count, sparsity, sparsity_per_layer, newly_important_per_layer_head, no_longer_important_per_layer_head, seq_len, sparsity_proportion); при построении распределения скоров — сохранённые attention rows (step_<k>.npz).
+- **Входные данные**: `metadata.json` по каждому запросу (per_step: шаги, num_important_tokens, newly_important_count, no_longer_important_count, sparsity, sparsity_per_layer, sparsity_proportion_per_layer, sparsity_proportion_per_layer_head, newly_important_per_layer_head, no_longer_important_per_layer_head, seq_len, sparsity_proportion); при построении распределения скоров — сохранённые attention rows (step_<k>.npz).
 - **Результаты**: графики динамики (число важных токенов по шагам; динамика добавления новых важных токенов и удаления старых — newly/no_longer; динамика доли неважных токенов — sparsity proportion по шагам); общее распределение скоров (гистограмма весов attention по сохранённым шагам); статистика разреженности (по per_step sparsity — по шагам, heatmap по слоям/головам, sparsity proportion по шагам).
 - **Сохранение**: в каталог `visualization_output_dir` (или `output_dir/visualization`), форматы из `visualization_formats`. Имена файлов вида `request_<id>_importance_dynamics`, `request_<id>_sparsity_stats`, `request_<id>_score_distribution`, а также сводный `score_distribution_all`.
 - **Запуск**: из пайплайна после записи ответов (если `visualization_enabled`) или отдельной командой: `python -m visualization.generate <config>`.

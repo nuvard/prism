@@ -30,6 +30,8 @@ from .importance import (
     should_save_on_step,
     sparsity_per_layer,
     sparsity_proportion,
+    sparsity_proportion_per_layer,
+    sparsity_proportion_per_layer_head,
     step_importance_and_sparsity,
 )
 from .io import (
@@ -241,6 +243,12 @@ def _process_one(
         sparsity_list = sparsity_arr.tolist()
         sparsity_per_layer_list = sparsity_per_layer(sparsity_arr).tolist()
         seq_len = int(current_row.shape[-1])
+        sparsity_proportion_per_layer_head_list = sparsity_proportion_per_layer_head(
+            sparsity_arr, seq_len
+        ).tolist()
+        sparsity_proportion_per_layer_list = sparsity_proportion_per_layer(
+            sparsity_arr, seq_len
+        ).tolist()
         step_entry: dict[str, Any] = {
             "step": step,
             "num_important_tokens": num_important,
@@ -252,6 +260,8 @@ def _process_one(
             "no_longer_important_per_layer_head": count_no_longer_per_layer_head,
             "sparsity": sparsity_list,
             "sparsity_per_layer": sparsity_per_layer_list,
+            "sparsity_proportion_per_layer_head": sparsity_proportion_per_layer_head_list,
+            "sparsity_proportion_per_layer": sparsity_proportion_per_layer_list,
             "seq_len": seq_len,
             "sparsity_proportion": sparsity_proportion(num_important, seq_len),
         }
