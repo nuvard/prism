@@ -156,6 +156,43 @@ def compute_deltas_per_layer(
     )
 
 
+def compute_deltas_per_layer_head(
+    prev_per_layer_head: list[list[frozenset[int]]],
+    curr_per_layer_head: list[list[frozenset[int]]],
+) -> tuple[list[list[int]], list[list[int]]]:
+    """
+    Compute newly_important and no_longer_important counts for each (layer, head).
+
+    For each (layer, head), applies compute_deltas to prev vs curr important sets.
+
+    Args:
+        prev_per_layer_head: result[layer][head] is frozenset of important indices at previous step.
+        curr_per_layer_head: result[layer][head] is frozenset of important indices at current step.
+
+    Returns:
+        (count_new_per_layer_head, count_no_longer_per_layer_head), each list[list[int]]
+        with shape [layer][head]. Counts are raw integers.
+    """
+    n_layers = max(len(prev_per_layer_head), len(curr_per_layer_head))
+    count_new: list[list[int]] = []
+    count_no_longer: list[list[int]] = []
+    for L in range(n_layers):
+        prev_heads = prev_per_layer_head[L] if L < len(prev_per_layer_head) else []
+        curr_heads = curr_per_layer_head[L] if L < len(curr_per_layer_head) else []
+        n_heads = max(len(prev_heads), len(curr_heads))
+        row_new: list[int] = []
+        row_no_longer: list[int] = []
+        for H in range(n_heads):
+            prev_set = prev_heads[H] if H < len(prev_heads) else frozenset()
+            curr_set = curr_heads[H] if H < len(curr_heads) else frozenset()
+            _, _, cn, cl = compute_deltas(prev_set, curr_set)
+            row_new.append(cn)
+            row_no_longer.append(cl)
+        count_new.append(row_new)
+        count_no_longer.append(row_no_longer)
+    return (count_new, count_no_longer)
+
+
 def sparsity_count_above_threshold(
     weights_1d: ArrayLike,
     sparsity_threshold: float,
@@ -193,6 +230,22 @@ def sparsity_per_layer_head(
     arr = np.asarray(attention_row, dtype=np.float64)
     above = arr > sparsity_threshold
     return np.count_nonzero(above, axis=-1).astype(np.int32)
+
+
+def sparsity_per_layer(sparsity_layer_head: np.ndarray) -> np.ndarray:
+    """
+    Aggregate sparsity per layer (sum over heads).
+
+    Args:
+        sparsity_layer_head: Array of shape (num_layers, num_heads) from sparsity_per_layer_head.
+
+    Returns:
+        Array of shape (num_layers,) of dtype int (raw count per layer).
+    """
+    arr = np.asarray(sparsity_layer_head, dtype=np.int64)
+    if arr.ndim < 2:
+        return np.array([], dtype=np.int32)
+    return arr.sum(axis=1).astype(np.int32)
 
 
 def sparsity_proportion(num_important: int, seq_len: int) -> float:

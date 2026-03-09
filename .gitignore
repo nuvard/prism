@@ -46,7 +46,3 @@ Thumbs.db
 # Project outputs (configurable output_dir)
 output/
 out/
-
-# Local config overrides (optional)
-configs/local*.yaml
-configs/local*.json

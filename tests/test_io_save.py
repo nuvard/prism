@@ -185,6 +185,45 @@ def test_load_metadata_with_per_layer_deltas(tmp_output_dir: Path) -> None:
     assert meta["per_step"][0]["no_longer_important_per_layer"] == [0, 0]
 
 
+def test_load_metadata_with_sparsity_per_layer_and_per_layer_head_deltas(
+    tmp_output_dir: Path,
+) -> None:
+    """Write and load metadata with sparsity_per_layer and per-layer-head deltas."""
+    request_id = "request_2"
+    per_step = [
+        {
+            "step": 0,
+            "num_important_tokens": 3,
+            "newly_important_count": 3,
+            "no_longer_important_count": 0,
+            "newly_important_per_layer": [1, 2],
+            "no_longer_important_per_layer": [0, 0],
+            "newly_important_per_layer_head": [[1, 0], [1, 1]],
+            "no_longer_important_per_layer_head": [[0, 0], [0, 0]],
+            "sparsity": [[2, 3], [4, 5]],
+            "sparsity_per_layer": [5, 9],
+            "seq_len": 10,
+            "sparsity_proportion": 0.7,
+        },
+    ]
+    write_metadata(
+        tmp_output_dir,
+        request_id,
+        importance_threshold=0.95,
+        save_every_n_steps=5,
+        save_when_new_important_above_k=3,
+        save_prefill_attention=False,
+        thinking_events=[],
+        per_step=per_step,
+        num_layers=2,
+        num_heads=2,
+    )
+    meta = load_metadata(tmp_output_dir, request_id)
+    assert meta["per_step"][0]["sparsity_per_layer"] == [5, 9]
+    assert meta["per_step"][0]["newly_important_per_layer_head"] == [[1, 0], [1, 1]]
+    assert meta["per_step"][0]["no_longer_important_per_layer_head"] == [[0, 0], [0, 0]]
+
+
 def test_write_progress(tmp_output_dir: Path) -> None:
     """Write progress.json and verify content and atomic write."""
     path = write_progress(

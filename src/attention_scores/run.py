@@ -24,9 +24,11 @@ from .device import get_device
 from .importance import (
     compute_deltas,
     compute_deltas_per_layer,
+    compute_deltas_per_layer_head,
     important_indices_per_layer_head,
     layer_important_union,
     should_save_on_step,
+    sparsity_per_layer,
     sparsity_proportion,
     step_importance_and_sparsity,
 )
@@ -144,6 +146,7 @@ def _process_one(
     thinking_events: list[ThinkingEvent] = []
     seen_markers: set[str] = set()
     prev_important_per_layer: list[frozenset[int]] = []
+    prev_important_per_layer_head: list[list[frozenset[int]]] = []
 
     # Prefill
     if config.save_prefill_attention and input_ids.size(1) > 0:
@@ -184,6 +187,9 @@ def _process_one(
             num_layers = len(out.attentions)
             num_heads = out.attentions[0].shape[1]
             prev_important_per_layer = [frozenset() for _ in range(num_layers)]
+            prev_important_per_layer_head = [
+                [frozenset() for _ in range(num_heads)] for _ in range(num_layers)
+            ]
 
         current_row = extract_current_row_from_attentions(out.attentions, batch_index=0)
         important_set, num_important, sparsity_arr = step_importance_and_sparsity(
@@ -209,6 +215,11 @@ def _process_one(
         ) = compute_deltas_per_layer(prev_important_per_layer, curr_important_per_layer)
         prev_important_per_layer = curr_important_per_layer
 
+        count_new_per_layer_head, count_no_longer_per_layer_head = (
+            compute_deltas_per_layer_head(prev_important_per_layer_head, important_lh)
+        )
+        prev_important_per_layer_head = [list(layer_heads) for layer_heads in important_lh]
+
         text_so_far = tokenizer.decode(generated[0], skip_special_tokens=False)
         new_evs, seen_markers = detect_new_markers_at_step(
             text_so_far, step, config.thinking_markers, seen_markers
@@ -228,6 +239,7 @@ def _process_one(
             last_saved_step = step
 
         sparsity_list = sparsity_arr.tolist()
+        sparsity_per_layer_list = sparsity_per_layer(sparsity_arr).tolist()
         seq_len = int(current_row.shape[-1])
         step_entry: dict[str, Any] = {
             "step": step,
@@ -236,7 +248,10 @@ def _process_one(
             "no_longer_important_count": count_no_longer,
             "newly_important_per_layer": count_new_per_layer,
             "no_longer_important_per_layer": count_no_longer_per_layer,
+            "newly_important_per_layer_head": count_new_per_layer_head,
+            "no_longer_important_per_layer_head": count_no_longer_per_layer_head,
             "sparsity": sparsity_list,
+            "sparsity_per_layer": sparsity_per_layer_list,
             "seq_len": seq_len,
             "sparsity_proportion": sparsity_proportion(num_important, seq_len),
         }

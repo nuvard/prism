@@ -9,6 +9,7 @@ from attention_scores.importance import (
     important_indices,
     importance_from_attention_row,
     sparsity_count_above_threshold,
+    sparsity_per_layer,
     sparsity_per_layer_head,
     sparsity_proportion,
     step_importance_and_sparsity,
@@ -89,6 +90,24 @@ def test_sparsity_per_layer_head_shape() -> None:
     sp = sparsity_per_layer_head(arr, sparsity_threshold=0.05)
     assert sp.shape == (2, 3)
     assert sp.dtype == np.int32
+
+
+def test_sparsity_per_layer_sum_over_heads() -> None:
+    """sparsity_per_layer returns sum over heads for each layer (raw counts)."""
+    # (2 layers, 3 heads): layer0 sums to 9, layer1 sums to 6
+    sparsity_lh = np.array([[2, 3, 4], [1, 2, 3]], dtype=np.int32)
+    per_layer = sparsity_per_layer(sparsity_lh)
+    assert per_layer.shape == (2,)
+    assert per_layer.dtype == np.int32
+    assert per_layer[0] == 9
+    assert per_layer[1] == 6
+
+
+def test_sparsity_per_layer_empty() -> None:
+    """sparsity_per_layer returns empty array for 0 or 1-dim input."""
+    assert sparsity_per_layer(np.array([])).shape == (0,)
+    assert sparsity_per_layer(np.array([[1, 2]])).shape == (1,)
+    assert sparsity_per_layer(np.array([[1, 2]]))[0] == 3
 
 
 def test_step_importance_and_sparsity() -> None:

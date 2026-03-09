@@ -28,7 +28,10 @@ class PerStepDict(TypedDict, total=False):
     no_longer_important_count: int
     newly_important_per_layer: list[int]
     no_longer_important_per_layer: list[int]
+    newly_important_per_layer_head: list[list[int]]
+    no_longer_important_per_layer_head: list[list[int]]
     sparsity: list[list[int]]
+    sparsity_per_layer: list[int]
     seq_len: int
     sparsity_proportion: float
 

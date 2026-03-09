@@ -7,6 +7,7 @@ import pytest
 
 from attention_scores.importance import (
     compute_deltas_per_layer,
+    compute_deltas_per_layer_head,
     important_indices_per_layer_head,
     layer_important_union,
 )
@@ -99,6 +100,41 @@ def test_compute_deltas_per_layer_length_mismatch() -> None:
     assert len(count_new) == 2
     assert count_new == [0, 1]
     assert count_no_longer == [0, 0]
+
+
+def test_compute_deltas_per_layer_head_first_step() -> None:
+    """First step: prev empty -> all newly important per head, no no_longer."""
+    prev = [[frozenset(), frozenset()], [frozenset(), frozenset()]]
+    curr = [[frozenset({0, 1}), frozenset({2})], [frozenset({3}), frozenset({4, 5})]]
+    count_new, count_no_longer = compute_deltas_per_layer_head(prev, curr)
+    assert count_new == [[2, 1], [1, 2]]
+    assert count_no_longer == [[0, 0], [0, 0]]
+
+
+def test_compute_deltas_per_layer_head_same_sets() -> None:
+    """Same sets per head -> no deltas."""
+    s = [[frozenset({0, 1}), frozenset({2})], [frozenset({3})]]
+    count_new, count_no_longer = compute_deltas_per_layer_head(s, s)
+    assert count_new == [[0, 0], [0]]
+    assert count_no_longer == [[0, 0], [0]]
+
+
+def test_compute_deltas_per_layer_head_one_new_one_removed() -> None:
+    """One head gains a token, another loses one."""
+    prev = [[frozenset({0, 1}), frozenset({2, 3})]]
+    curr = [[frozenset({0, 1, 2}), frozenset({3})]]  # head0: +2; head1: -2
+    count_new, count_no_longer = compute_deltas_per_layer_head(prev, curr)
+    assert count_new == [[1, 0]]
+    assert count_no_longer == [[0, 1]]
+
+
+def test_compute_deltas_per_layer_head_length_mismatch() -> None:
+    """curr has more layers/heads: missing prev treated as empty."""
+    prev = [[frozenset({0})]]
+    curr = [[frozenset({0}), frozenset({1})], [frozenset({2})]]
+    count_new, count_no_longer = compute_deltas_per_layer_head(prev, curr)
+    assert count_new == [[0, 1], [1]]
+    assert count_no_longer == [[0, 0], [0]]
 
 
 def test_full_flow_two_steps_artificial() -> None:
