@@ -1,0 +1,15 @@
+dataset_path: ""
+model_path: ""
+batch_size: 1
+max_output_len: 128
+save_every_n_steps: 5
+save_when_new_important_above_k: 3
+importance_threshold: 0.95
+thinking_markers:
+  - "\\think"
+  - "Wait,"
+  - "Hmm,"
+output_dir: "./output"
+save_prefill_attention: false
+sparsity_threshold: 1.0e-6
+# device: "auto"  # or "cpu", "cuda", "cuda:0", "npu", "npu:0"

@@ -1,0 +1,13 @@
+# Core
+transformers>=4.36.0
+torch>=2.0.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+numpy>=1.24.0
+PyYAML>=6.0
+
+# Testing
+pytest>=7.0.0
+
+# Optional: NPU (Ascend) via torch_npu API — install separately to match PyTorch/CANN:
+# torch_npu
