@@ -49,6 +49,14 @@ class Config(BaseModel):
         default_factory=lambda: ["png"],
         description="File formats for saved plots (e.g. png, svg)",
     )
+    progress_file: bool = Field(
+        True,
+        description="Write progress.json to output_dir with current request and step",
+    )
+    progress_log_every_n_steps: int | None = Field(
+        None,
+        description="Log step progress every N steps; if None, log only when saving attention row",
+    )
 
     @field_validator("dataset_path", "model_path", "output_dir", "visualization_output_dir", mode="before")
     @classmethod

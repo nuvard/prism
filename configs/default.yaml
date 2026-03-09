@@ -13,6 +13,10 @@ output_dir: "./output"
 save_prefill_attention: false
 sparsity_threshold: 1.0e-6
 # device: "auto"  # or "cpu", "cuda", "cuda:0", "npu", "npu:0"
+# Progress tracking
+progress_file: true
+# progress_log_every_n_steps: null  # log step every N; null = only when saving attention row
+
 # Visualization (post-processing)
 # visualization_output_dir: ""   # default: output_dir/visualization
 visualization_enabled: true

@@ -55,9 +55,10 @@ def write_metadata(
     """
     Write metadata.json for one request.
 
-    per_step: list of dicts, one per saved step, each with keys e.g. step, num_important_tokens,
-    newly_important_count, no_longer_important_count, sparsity (list of list or dict layer -> head -> value),
-    seq_len, sparsity_proportion.
+    per_step: list of dicts, one per decode step (call after each step to keep file updated).
+    Each entry may contain: step, num_important_tokens, newly_important_count, no_longer_important_count,
+    newly_important_per_layer, no_longer_important_per_layer (lists of length num_layers),
+    sparsity (list of list layer -> head -> value), seq_len, sparsity_proportion.
     """
     dir_path = _request_dir(output_dir, request_id)
     dir_path.mkdir(parents=True, exist_ok=True)
@@ -170,4 +171,45 @@ def write_dataset_used(
     path = out / "dataset_used.json"
     with open(path, "w", encoding="utf-8") as f:
         json.dump(dataset_items, f, ensure_ascii=False, indent=2)
+    return path
+
+
+def write_progress(
+    output_dir: str | Path,
+    *,
+    current_request_index: int,
+    total_requests: int,
+    request_id: str,
+    current_step: int,
+    max_output_len: int | None = None,
+) -> Path:
+    """
+    Write progress.json atomically (temp file + rename) for external progress tracking.
+
+    Args:
+        output_dir: Root output directory.
+        current_request_index: 0-based index of current request.
+        total_requests: Total number of requests.
+        request_id: Current request id.
+        current_step: Current decode step.
+        max_output_len: Max decode steps (optional).
+
+    Returns:
+        Path to progress.json.
+    """
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, Any] = {
+        "current_request_index": current_request_index,
+        "total_requests": total_requests,
+        "request_id": request_id,
+        "current_step": current_step,
+    }
+    if max_output_len is not None:
+        payload["max_output_len"] = max_output_len
+    path = out / "progress.json"
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    tmp.replace(path)
     return path

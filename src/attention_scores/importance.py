@@ -61,6 +61,101 @@ def compute_deltas(
     return (newly, no_longer, len(newly), len(no_longer))
 
 
+def important_indices_per_layer_head(
+    attention_row: ArrayLike,
+    importance_threshold: float = 0.95,
+) -> list[list[frozenset[int]]]:
+    """
+    Compute important indices for each (layer, head) from the attention row.
+
+    For each layer and head, applies important_indices to that head's row
+    (attention_row[layer, head, :]).
+
+    Args:
+        attention_row: Array of shape (num_layers, num_heads, seq_len).
+        importance_threshold: Cumulative weight threshold (e.g. 0.95).
+
+    Returns:
+        Nested list: result[layer][head] is frozenset of important position indices.
+    """
+    arr = np.asarray(attention_row, dtype=np.float64)
+    if arr.ndim != 3:
+        return []
+    n_layers, n_heads, _ = arr.shape
+    out: list[list[frozenset[int]]] = []
+    for L in range(n_layers):
+        layer_heads: list[frozenset[int]] = []
+        for H in range(n_heads):
+            indices, _ = important_indices(arr[L, H, :], importance_threshold)
+            layer_heads.append(indices)
+        out.append(layer_heads)
+    return out
+
+
+def layer_important_union(
+    important_per_layer_head: list[list[frozenset[int]]],
+) -> list[frozenset[int]]:
+    """
+    For each layer, compute the union of important indices across all heads.
+
+    Layer-level "important" = important for at least one head in that layer.
+
+    Args:
+        important_per_layer_head: result[layer][head] is frozenset of important indices.
+
+    Returns:
+        List of length num_layers: union of head sets per layer.
+    """
+    return [
+        frozenset().union(*heads) if heads else frozenset()
+        for heads in important_per_layer_head
+    ]
+
+
+def compute_deltas_per_layer(
+    prev_per_layer: list[frozenset[int]],
+    curr_per_layer: list[frozenset[int]],
+) -> tuple[
+    list[frozenset[int]],
+    list[frozenset[int]],
+    list[int],
+    list[int],
+]:
+    """
+    Compute newly_important and no_longer_important per layer between two steps.
+
+    For each layer, applies the same logic as compute_deltas to the layer's
+    important set (union over heads).
+
+    Args:
+        prev_per_layer: List of important index sets per layer at previous step.
+        curr_per_layer: List of important index sets per layer at current step.
+
+    Returns:
+        (newly_per_layer, no_longer_per_layer, count_new_per_layer, count_no_longer_per_layer).
+        Each list has length = number of layers. Counts are raw integers.
+    """
+    n = max(len(prev_per_layer), len(curr_per_layer))
+    newly_per_layer: list[frozenset[int]] = []
+    no_longer_per_layer: list[frozenset[int]] = []
+    count_new_per_layer: list[int] = []
+    count_no_longer_per_layer: list[int] = []
+    for i in range(n):
+        prev_set = prev_per_layer[i] if i < len(prev_per_layer) else frozenset()
+        curr_set = curr_per_layer[i] if i < len(curr_per_layer) else frozenset()
+        newly, no_longer, cn, cl = compute_deltas(prev_set, curr_set)
+        newly_per_layer.append(newly)
+        no_longer_per_layer.append(no_longer)
+        count_new_per_layer.append(cn)
+        count_no_longer_per_layer.append(cl)
+    return (
+        newly_per_layer,
+        no_longer_per_layer,
+        count_new_per_layer,
+        count_no_longer_per_layer,
+    )
+
+
 def sparsity_count_above_threshold(
     weights_1d: ArrayLike,
     sparsity_threshold: float,

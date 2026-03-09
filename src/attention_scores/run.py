@@ -8,6 +8,7 @@ deltas, sparsity; save conditionally; track thinking markers; write outputs via 
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,9 @@ from .dataset_schema import DatasetItem, load_dataset
 from .device import get_device
 from .importance import (
     compute_deltas,
+    compute_deltas_per_layer,
+    important_indices_per_layer_head,
+    layer_important_union,
     should_save_on_step,
     sparsity_proportion,
     step_importance_and_sparsity,
@@ -33,6 +37,7 @@ from .io import (
     write_generated_answers,
     write_metadata,
     write_prefill,
+    write_progress,
 )
 from .thinking import ThinkingEvent, detect_new_markers_at_step
 
@@ -52,9 +57,16 @@ def run_pipeline(config_path: str | Path) -> None:
 
     answers: list[dict[str, Any]] = []
 
+    total_requests = len(dataset)
     for idx, item in enumerate(dataset):
         request_id = item.get_request_id(idx)
         prompt = item.question
+        logging.info(
+            "Processing request %s/%s: %s",
+            idx + 1,
+            total_requests,
+            request_id,
+        )
         result = _process_one(
             request_id=request_id,
             prompt=prompt,
@@ -64,6 +76,8 @@ def run_pipeline(config_path: str | Path) -> None:
             tokenizer=tokenizer,
             device=device,
             output_dir=config.output_dir,
+            total_requests=total_requests,
+            request_index=idx,
         )
         answers.append(result["answer_record"])
 
@@ -105,6 +119,9 @@ def _process_one(
     tokenizer: Any,
     device: torch.device,
     output_dir: str,
+    *,
+    total_requests: int,
+    request_index: int,
 ) -> dict[str, Any]:
     """
     Process one request: tokenize, optional prefill save, decode loop, save metadata and rows.
@@ -126,6 +143,7 @@ def _process_one(
     per_step_meta: list[dict[str, Any]] = []
     thinking_events: list[ThinkingEvent] = []
     seen_markers: set[str] = set()
+    prev_important_per_layer: list[frozenset[int]] = []
 
     # Prefill
     if config.save_prefill_attention and input_ids.size(1) > 0:
@@ -144,6 +162,8 @@ def _process_one(
     last_saved_step: int | None = None
     max_new = config.max_output_len
     n_steps = 0
+    progress_log_every = getattr(config, "progress_log_every_n_steps", None)
+    write_progress_file = getattr(config, "progress_file", True)
 
     for step in range(max_new):
         with torch.no_grad():
@@ -163,6 +183,7 @@ def _process_one(
         if num_layers == 0:
             num_layers = len(out.attentions)
             num_heads = out.attentions[0].shape[1]
+            prev_important_per_layer = [frozenset() for _ in range(num_layers)]
 
         current_row = extract_current_row_from_attentions(out.attentions, batch_index=0)
         important_set, num_important, sparsity_arr = step_importance_and_sparsity(
@@ -174,6 +195,19 @@ def _process_one(
             prev_important, important_set
         )
         prev_important = important_set
+
+        # Per-layer importance (union over heads) and deltas
+        important_lh = important_indices_per_layer_head(
+            current_row, config.importance_threshold
+        )
+        curr_important_per_layer = layer_important_union(important_lh)
+        (
+            _newly_per_layer,
+            _no_longer_per_layer,
+            count_new_per_layer,
+            count_no_longer_per_layer,
+        ) = compute_deltas_per_layer(prev_important_per_layer, curr_important_per_layer)
+        prev_important_per_layer = curr_important_per_layer
 
         text_so_far = tokenizer.decode(generated[0], skip_special_tokens=False)
         new_evs, seen_markers = detect_new_markers_at_step(
@@ -192,17 +226,47 @@ def _process_one(
             write_attention_row_step(output_dir, request_id, step, current_row)
             saved_steps.append(step)
             last_saved_step = step
-            sparsity_list = sparsity_arr.tolist()
-            seq_len = int(current_row.shape[-1])
-            per_step_meta.append({
-                "step": step,
-                "num_important_tokens": num_important,
-                "newly_important_count": count_new,
-                "no_longer_important_count": count_no_longer,
-                "sparsity": sparsity_list,
-                "seq_len": seq_len,
-                "sparsity_proportion": sparsity_proportion(num_important, seq_len),
-            })
+
+        sparsity_list = sparsity_arr.tolist()
+        seq_len = int(current_row.shape[-1])
+        step_entry: dict[str, Any] = {
+            "step": step,
+            "num_important_tokens": num_important,
+            "newly_important_count": count_new,
+            "no_longer_important_count": count_no_longer,
+            "newly_important_per_layer": count_new_per_layer,
+            "no_longer_important_per_layer": count_no_longer_per_layer,
+            "sparsity": sparsity_list,
+            "seq_len": seq_len,
+            "sparsity_proportion": sparsity_proportion(num_important, seq_len),
+        }
+        per_step_meta.append(step_entry)
+        write_metadata(
+            output_dir,
+            request_id,
+            importance_threshold=config.importance_threshold,
+            save_every_n_steps=config.save_every_n_steps,
+            save_when_new_important_above_k=config.save_when_new_important_above_k,
+            save_prefill_attention=config.save_prefill_attention,
+            thinking_events=thinking_events,
+            per_step=per_step_meta,
+            num_layers=num_layers,
+            num_heads=num_heads,
+        )
+
+        if write_progress_file:
+            write_progress(
+                output_dir,
+                current_request_index=request_index,
+                total_requests=total_requests,
+                request_id=request_id,
+                current_step=step,
+                max_output_len=max_new,
+            )
+        if progress_log_every is not None and step % progress_log_every == 0:
+            logging.info("Request %s, step %s/%s", request_id, step, max_new)
+        elif progress_log_every is None and do_save:
+            logging.info("Request %s, step %s (saved)", request_id, step)
 
         if next_token.item() == tokenizer.eos_token_id:
             break

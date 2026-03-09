@@ -156,3 +156,38 @@ def test_aggregate_request_metrics_backfill_sparsity_proportion(tmp_output_dir: 
     )
     metrics = aggregate_request_metrics(tmp_output_dir, request_id)
     assert metrics["sparsity_proportion"] == [0.8]  # (10 - 2) / 10
+
+
+def test_aggregate_request_metrics_per_step_every_step(tmp_output_dir: Path) -> None:
+    """When per_step has one entry per decode step (N entries), aggregate returns length N."""
+    tmp_output_dir.mkdir(parents=True, exist_ok=True)
+    request_id = "request_full_steps"
+    n_steps = 10
+    per_step = [
+        {
+            "step": i,
+            "num_important_tokens": 3 + i,
+            "newly_important_count": 1,
+            "no_longer_important_count": 0,
+            "sparsity": [[1], [1]],
+            "seq_len": 20,
+            "sparsity_proportion": 0.85,
+        }
+        for i in range(n_steps)
+    ]
+    write_metadata(
+        tmp_output_dir,
+        request_id,
+        importance_threshold=0.95,
+        save_every_n_steps=5,
+        save_when_new_important_above_k=3,
+        save_prefill_attention=False,
+        thinking_events=[],
+        per_step=per_step,
+        num_layers=1,
+        num_heads=2,
+    )
+    metrics = aggregate_request_metrics(tmp_output_dir, request_id)
+    assert len(metrics["steps"]) == n_steps
+    assert len(metrics["num_important_tokens"]) == n_steps
+    assert metrics["steps"] == list(range(n_steps))
